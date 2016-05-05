@@ -24,6 +24,7 @@ mod tests {
             Ok(v) => 
                 assert!(result2 == &v.to_hex()),
                 Err(XorError::DifferentSize(a,b)) => println!("different size {} vs {}",a,b),
+            _ => panic!("wow"),
         }
     }
 
@@ -34,6 +35,17 @@ mod tests {
         let key3 = String::from("ICE");
         let encrypted = xor_repeat(&test3.as_bytes(),&key3.as_bytes());
         assert!(encrypted.to_hex() == "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20");
+    }
+
+    #[test]
+    fn set1_exo3() {
+        let test3 = String::from("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736").from_hex().unwrap();
+        let test3Str = String::from_utf8(test3).unwrap();
+        let (plain,key) = decrypt_single_xor(&test3Str,constants::FREQUENCY);
+        let testResult = &"Cooking MC's like a pound of bacon";
+        //println!("key = {} => {}",key,plain);
+        assert_eq!(key,'X');
+        assert!(&plain == testResult);
     }
 
 }
