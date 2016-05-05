@@ -53,7 +53,7 @@ pub fn decrypt_single_xor(cipher :&str,frequencies :&[f32]) -> (String,char) {
             plaintext = out;
         }
     }
-    let re = String::from_utf8(plaintext.to_owned()).unwrap();
+    let re = String::from_utf8(plaintext).unwrap();
     return (re,kc)
 }
 

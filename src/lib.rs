@@ -23,6 +23,7 @@ macro_rules! map(
 );
 
 
+// estimate keylength in a XOR cipher between *min* and *max*
 fn estimate_key_length(cipher :&str,min :usize, max :usize) -> HashMap<usize,f32> {
     let mut results = HashMap::new();
     // for each key size

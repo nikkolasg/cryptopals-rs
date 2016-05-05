@@ -43,7 +43,6 @@ mod tests {
         let test3Str = String::from_utf8(test3).unwrap();
         let (plain,key) = decrypt_single_xor(&test3Str,constants::FREQUENCY);
         let testResult = &"Cooking MC's like a pound of bacon";
-        //println!("key = {} => {}",key,plain);
         assert_eq!(key,'X');
         assert!(&plain == testResult);
     }
