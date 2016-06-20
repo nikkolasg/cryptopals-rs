@@ -5,3 +5,4 @@ authors = ["nikkolasg <nikkolasg@gmail.com>"]
 
 [dependencies]
 rustc-serialize = "0.3"
+rust-crypto = "^0.2"
