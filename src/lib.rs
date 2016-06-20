@@ -32,24 +32,20 @@ macro_rules! map(
     );
 
 pub fn is_aes_ecb(cipher :&[u8]) -> bool {
-    let mut blocks :Vec<&[u8]> = Vec::new();
     // split in 16 blocks
-    for block in cipher.chunks(16) {
-        blocks.push(block)
-    }
-
-    for (i,b1) in blocks.iter().enumerate() {
-        for (j,b2) in blocks.iter().enumerate() {
+    for (i,block) in cipher.chunks(16).enumerate() {
+        // compare with other 16 blocks
+        for (j,block2) in cipher.chunks(16).enumerate() {
             if i == j {
                 continue
             }
-
-            if b1 == b2 {
+            if block == block2 {
                 println!("Block {} and {} are equal!",i,j);
                 return true;
             }
         }
     }
+
     false
 }
 pub fn decrypt_aes_cbc(msg :&[u8],key :&[u8]) -> Vec<u8> {
