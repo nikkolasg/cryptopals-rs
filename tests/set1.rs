@@ -4,6 +4,9 @@ extern crate rustc_serialize as serialize;
 #[cfg(test)]
 mod tests {
     use cryptopals::*;
+    use cryptopals::sone::*;
+    use cryptopals::xor::*;
+
     use serialize::hex::FromHex;
     use serialize::hex::ToHex;
     use serialize::base64::FromBase64;

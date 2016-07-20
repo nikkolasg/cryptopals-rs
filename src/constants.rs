@@ -13,6 +13,7 @@ pub const IC_ENG :f64 = 1.73;
 // a static array of bytes representing chars
 pub const BASE64 :&'static [u8]= b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
 
+
 #[test]
 fn test_frequency_length() {
     assert!(FREQUENCY.len() == 26);
