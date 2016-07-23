@@ -45,9 +45,8 @@ pub fn cbc_decrypt(cipher :&[u8],key :&[u8], iv :&[u8]) -> Result<Vec<u8>,BlockE
         }; 
         let xored = match xor::xor_fixed(&result,xor_i) {
             Ok(b) => b,
-            //Err(e) => return Err(BlockError::XorError(e)),
             // TODO check the pattern matching expansion doc to embed a XorError inside a
-            // BlockError
+            // BlockError directly (no field Xor)
             Err(x) => return Err(BlockError::Xor(x)),
         };
         final_result.extend(xored);

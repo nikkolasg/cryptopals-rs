@@ -69,6 +69,7 @@ pub fn decrypt_aes_ecb(msg :&[u8],key :&[u8],dec :&mut Box<Decryptor + 'static>)
 
     loop {
         let result = dec.decrypt(&mut read_buffer, &mut write_buffer, true);
+        // TODO XXX Check : Does it do a copy here ?
         final_result.extend(write_buffer.take_read_buffer().take_remaining().iter().map(|&i| i));
         match result {
             Ok(BufferResult::BufferUnderflow) => break,
