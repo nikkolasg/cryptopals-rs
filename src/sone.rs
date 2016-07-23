@@ -9,6 +9,7 @@ use self::serialize::hex::ToHex;
 use self::crypto::aes;
 use self::crypto::blockmodes;
 use self::crypto::symmetriccipher::Decryptor;
+use self::crypto::symmetriccipher::SymmetricCipherError;
 use self::crypto::buffer;
 use self::crypto::buffer::{BufferResult,WriteBuffer,ReadBuffer};
 
@@ -49,8 +50,18 @@ pub fn is_aes_ecb(cipher :&[u8]) -> bool {
 
     false
 }
-pub fn decrypt_aes_cbc(msg :&[u8],key :&[u8]) -> Vec<u8> {
-    let mut dec = aes::ecb_decryptor(aes::KeySize::KeySize128,key,blockmodes::PkcsPadding);
+pub fn decrypt_aes_ecb_pkcs(msg :&[u8],key :&[u8]) -> Result<Vec<u8>,SymmetricCipherError>{
+    decrypt_aes_ecb(msg,key,&mut aes::ecb_decryptor(aes::KeySize::KeySize128,key,blockmodes::PkcsPadding))
+}
+
+
+pub fn decrypt_aes_ecb_nopad(msg :&[u8],key :&[u8]) -> Result<Vec<u8>,SymmetricCipherError>{
+    // need to put &mut to say we are passing down a mutable reference
+    // even if it is already mutable
+    decrypt_aes_ecb(msg,key,&mut aes::ecb_decryptor(aes::KeySize::KeySize128,key,blockmodes::NoPadding))
+}
+
+pub fn decrypt_aes_ecb(msg :&[u8],key :&[u8],dec :&mut Box<Decryptor + 'static>) -> Result<Vec<u8>,SymmetricCipherError>{
     let mut final_result = Vec::<u8>::new();
     let mut read_buffer = buffer::RefReadBuffer::new(msg);
     let mut buff = [0; 4096];
@@ -61,11 +72,11 @@ pub fn decrypt_aes_cbc(msg :&[u8],key :&[u8]) -> Vec<u8> {
         final_result.extend(write_buffer.take_read_buffer().take_remaining().iter().map(|&i| i));
         match result {
             Ok(BufferResult::BufferUnderflow) => break,
-            Ok(BufferResult::BufferOverflow)=> { panic!("yo"); }
-            Err(e) => panic!(e),
+            Ok(BufferResult::BufferOverflow)=> {},
+            Err(e) => return Err(e),
         }
     }
-    return final_result;
+    return Ok(final_result);
 }
 
 

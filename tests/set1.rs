@@ -70,9 +70,13 @@ mod tests {
     fn set1_exo7() {
         let b64 = CIPHERTEXT_S1_E7.from_base64().unwrap(); 
         let key = String::from("YELLOW SUBMARINE");
-        let res = decrypt_aes_cbc(&b64,&key.as_bytes());
-        let utf = String::from_utf8_lossy(&res);
-        println!("Res = {:?}",utf);
+        match decrypt_aes_ecb_pkcs(&b64,&key.as_bytes()) {
+            Err(e) => println!("Err {:?}",e),
+            Ok(res) => {
+                let utf = String::from_utf8_lossy(&res);
+                println!("Res = {:?}",utf);
+            },
+        };
     }
 
     #[test]
