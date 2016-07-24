@@ -1,9 +1,13 @@
 extern crate crypto;
+extern crate rand;
+
 use self::crypto::symmetriccipher::SymmetricCipherError;
 use self::crypto::aes;
 use self::crypto::blockmodes;
 use self::crypto::buffer;
 use self::crypto::buffer::{BufferResult,WriteBuffer,ReadBuffer};
+
+use self::rand::{ Rng, OsRng };
 
 use constants;
 use sone;
@@ -50,7 +54,7 @@ fn pkcs7_remove(buff :&[u8]) -> Vec<u8> {
 
 pub fn cbc_encrypt(data :&[u8],key :&[u8], iv :&[u8]) -> Result<Vec<u8>,BlockError> {
     let mut encryptor = aes::cbc_encryptor(
-        aes::KeySize::KeySize256,
+        aes::KeySize::KeySize128,
         key,
         iv,
         blockmodes::PkcsPadding);
@@ -74,31 +78,71 @@ pub fn cbc_encrypt(data :&[u8],key :&[u8], iv :&[u8]) -> Result<Vec<u8>,BlockErr
     Ok(final_result)
 }
 
-    pub fn cbc_decrypt(cipher :&[u8],key :&[u8], iv :&[u8]) -> Result<Vec<u8>,BlockError> {
-        if iv.len() != constants::AesBlockSize {
-            return Err(BlockError::WrongIvSize(iv.len(),constants::AesBlockSize))
-        }
-        let mut xor_i = iv;
-        let mut final_result = Vec::<u8>::new(); 
-        let last_block_i = (cipher.len() / constants::AesBlockSize) - 1;
-        for (i,chunk) in cipher.chunks(constants::AesBlockSize).enumerate() {
-            let result = match sone::decrypt_aes_ecb_nopad(chunk,key) {  
-                Err(e) => return Err(BlockError::Symmetric(e)),
-                Ok(r) => r,
-            }; 
-            let mut xored = match xor::xor_fixed(&result,xor_i) {
-                Ok(b) => b,
-                // TODO check the pattern matching expansion doc to embed 
-                // a XorError inside a BlockError directly (no field Xor)
-                Err(x) => return Err(BlockError::Xor(x)),
-            };
-            if i == last_block_i  {
-                xored = pkcs7_remove(&xored)
-            }
-            final_result.extend(xored);
-            xor_i = chunk;
-
-        }
-
-        return Ok(final_result)
+pub fn cbc_decrypt(cipher :&[u8],key :&[u8], iv :&[u8]) -> Result<Vec<u8>,BlockError> {
+    if iv.len() != constants::AesBlockSize {
+        return Err(BlockError::WrongIvSize(iv.len(),constants::AesBlockSize))
     }
+    let mut xor_i = iv;
+    let mut final_result = Vec::<u8>::new(); 
+    let last_block_i = (cipher.len() / constants::AesBlockSize) - 1;
+    for (i,chunk) in cipher.chunks(constants::AesBlockSize).enumerate() {
+        let result = match sone::decrypt_aes_ecb_nopad(chunk,key) {  
+            Err(e) => return Err(BlockError::Symmetric(e)),
+            Ok(r) => r,
+        }; 
+        let mut xored = match xor::xor_fixed(&result,xor_i) {
+            Ok(b) => b,
+            // TODO check the pattern matching expansion doc to embed 
+            // a XorError inside a BlockError directly (no field Xor)
+            Err(x) => return Err(BlockError::Xor(x)),
+        };
+        if i == last_block_i  {
+            xored = pkcs7_remove(&xored)
+        }
+        final_result.extend(xored);
+        xor_i = chunk;
+
+    }
+
+    return Ok(final_result)
+}
+
+#[test]
+fn test_pkcs_padding() {
+    let mut rng = OsRng::new().ok().unwrap();
+    let mut m_under :[u8;14] = [0;14];
+    let mut m_exact :[u8;16] = [0;16];
+    let mut m_over :[u8;17] = [0;17];
+    rng.fill_bytes(&mut m_under);
+    rng.fill_bytes(&mut m_exact);
+    rng.fill_bytes(&mut m_over);
+
+    let under_p = &pkcs7_padding(&m_under[..],constants::AesBlockSize);
+    let exact_p = &pkcs7_padding(&m_exact[..],constants::AesBlockSize);
+    let over_p  = &pkcs7_padding(&m_over[..],constants::AesBlockSize);
+
+    let under_u :&[u8] = &pkcs7_remove(under_p);
+    let exact_u :&[u8] = &pkcs7_remove(exact_p);
+    let over_u :&[u8] =  &pkcs7_remove(over_p);
+
+    assert_eq!(under_u,&m_under[..]);
+    assert_eq!(exact_u,&m_exact[..]);
+    assert_eq!(over_u,&m_over[..]);
+}
+
+#[test]
+fn test_aes_cbc() {
+    let mut key: [u8; 32] = [0; 32];
+    let mut iv: [u8; 16] = [0; 16];
+    let message = "Hello World, What a Pleasure!";
+
+    let mut rng = OsRng::new().ok().unwrap();
+    rng.fill_bytes(&mut key);
+    rng.fill_bytes(&mut iv);
+
+    let cipher = cbc_encrypt(message.as_bytes(),&key,&iv).ok().unwrap();
+    let plain = cbc_decrypt(&cipher,&key,&iv).ok().unwrap();
+
+    assert_eq!(message.as_bytes(),&plain[..]);
+    
+}
