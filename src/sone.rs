@@ -74,6 +74,11 @@ pub fn decrypt_aes_ecb(msg :&[u8],key :&[u8],dec :&mut Box<Decryptor + 'static>)
         match result {
             Ok(BufferResult::BufferUnderflow) => break,
             Ok(BufferResult::BufferOverflow)=> {},
+            Err(SymmetricCipherError::InvalidPadding) => {
+                //read_buffer.rewind(16);
+                //let rest :Vec<u8>= read_buffer.take_remaining().iter().map(|&i| i).collect();
+                println!("InvalidPadding: {:?}",msg);
+                return Err(SymmetricCipherError::InvalidPadding); },
             Err(e) => return Err(e),
         }
     }

@@ -22,7 +22,7 @@ mod tests {
         let key = "YELLOW SUBMARINE".as_bytes();        
         let iv = vec![0;constants::AesBlockSize];
         match cbc_decrypt(&CIPHER_S2_E10.from_base64().unwrap(),key,&iv) {
-            Ok(plain) => assert!(true),//println!("{}",String::from_utf8_lossy(&plain)),
+            Ok(plain) => println!("{}",String::from_utf8_lossy(&plain)),
             Err(e) => println!("Err {:?}",e),
         }
     }
