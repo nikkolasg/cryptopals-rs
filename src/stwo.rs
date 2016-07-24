@@ -1,5 +1,9 @@
 extern crate crypto;
 use self::crypto::symmetriccipher::SymmetricCipherError;
+use self::crypto::aes;
+use self::crypto::blockmodes;
+use self::crypto::buffer;
+use self::crypto::buffer::{BufferResult,WriteBuffer,ReadBuffer};
 
 use constants;
 use sone;
@@ -10,6 +14,7 @@ pub enum BlockError {
     WrongIvSize(usize,usize),
     Symmetric(SymmetricCipherError),
     Xor(xor::XorError),
+    Unknown,
 }
 
 
@@ -43,31 +48,57 @@ fn pkcs7_remove(buff :&[u8]) -> Vec<u8> {
     buff.iter().take(buff.len()-last as usize).map(|&i| i).collect::<Vec<u8>>()
 }
 
-pub fn cbc_decrypt(cipher :&[u8],key :&[u8], iv :&[u8]) -> Result<Vec<u8>,BlockError> {
-    if iv.len() != constants::AesBlockSize {
-        return Err(BlockError::WrongIvSize(iv.len(),constants::AesBlockSize))
-    }
-    let mut xor_i = iv;
-    let mut final_result = Vec::<u8>::new(); 
-    let last_block_i = (cipher.len() / constants::AesBlockSize) - 1;
-    for (i,chunk) in cipher.chunks(constants::AesBlockSize).enumerate() {
-        let result = match sone::decrypt_aes_ecb_nopad(chunk,key) {  
-            Err(e) => return Err(BlockError::Symmetric(e)),
-            Ok(r) => r,
-        }; 
-        let mut xored = match xor::xor_fixed(&result,xor_i) {
-            Ok(b) => b,
-            // TODO check the pattern matching expansion doc to embed 
-            // a XorError inside a BlockError directly (no field Xor)
-            Err(x) => return Err(BlockError::Xor(x)),
+pub fn cbc_encrypt(data :&[u8],key :&[u8], iv :&[u8]) -> Result<Vec<u8>,BlockError> {
+    let mut encryptor = aes::cbc_encryptor(
+        aes::KeySize::KeySize256,
+        key,
+        iv,
+        blockmodes::PkcsPadding);
+
+    let mut final_result = Vec::<u8>::new();
+    let mut read_buffer = buffer::RefReadBuffer::new(data);
+    let mut buffer = [0; 4096];
+    let mut write_buffer = buffer::RefWriteBuffer::new(&mut buffer);
+
+    loop {
+        let result = encryptor.encrypt(&mut read_buffer, &mut write_buffer, true);
+        final_result.extend(write_buffer.take_read_buffer().take_remaining().iter().map(|&i| i));
+
+        match result {
+            Ok(BufferResult::BufferUnderflow) => break,
+            Ok(BufferResult::BufferOverflow) => { },
+            Err(SymmetricCipherError::InvalidPadding) => return Err(BlockError::Symmetric(SymmetricCipherError::InvalidPadding)),
+            Err(SymmetricCipherError::InvalidLength) => return Err(BlockError::Symmetric(SymmetricCipherError::InvalidLength)),
         };
-        if i == last_block_i  {
-            xored = pkcs7_remove(&xored)
-        }
-        final_result.extend(xored);
-        xor_i = chunk;
-
     }
-
-    return Ok(final_result)
+    Ok(final_result)
 }
+
+    pub fn cbc_decrypt(cipher :&[u8],key :&[u8], iv :&[u8]) -> Result<Vec<u8>,BlockError> {
+        if iv.len() != constants::AesBlockSize {
+            return Err(BlockError::WrongIvSize(iv.len(),constants::AesBlockSize))
+        }
+        let mut xor_i = iv;
+        let mut final_result = Vec::<u8>::new(); 
+        let last_block_i = (cipher.len() / constants::AesBlockSize) - 1;
+        for (i,chunk) in cipher.chunks(constants::AesBlockSize).enumerate() {
+            let result = match sone::decrypt_aes_ecb_nopad(chunk,key) {  
+                Err(e) => return Err(BlockError::Symmetric(e)),
+                Ok(r) => r,
+            }; 
+            let mut xored = match xor::xor_fixed(&result,xor_i) {
+                Ok(b) => b,
+                // TODO check the pattern matching expansion doc to embed 
+                // a XorError inside a BlockError directly (no field Xor)
+                Err(x) => return Err(BlockError::Xor(x)),
+            };
+            if i == last_block_i  {
+                xored = pkcs7_remove(&xored)
+            }
+            final_result.extend(xored);
+            xor_i = chunk;
+
+        }
+
+        return Ok(final_result)
+    }
