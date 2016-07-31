@@ -4,6 +4,7 @@ extern crate rustc_serialize as serialize;
 #[cfg(test)]
 mod tests {
     use cryptopals::stwo::*;
+    use cryptopals::sone;
     use cryptopals::constants;
     use serialize::hex::ToHex;
     use serialize::base64::FromBase64;
@@ -27,7 +28,30 @@ mod tests {
         }
     }
 
-const CIPHER_S2_E10 :&'static [u8] = 
+    #[test]
+    fn set2_exo11() {
+        // constant message so we detect if different blocks are encoded the same
+        let msg = vec![0x80;16*4];
+        match blackbox_aes_encrypt(&msg) {
+            Ok((cipher,blockmode)) => {
+                println!("Cipher : {:?}",cipher);
+                let is_ecb = sone::is_aes_ecb(&cipher);
+                match blockmode {
+                    BlockMode::ECB if is_ecb => { return },
+                    BlockMode::CBC if !is_ecb => { return}, 
+                    _ => { println!("Did not find equal answer is_aes_ecb ({:?}) vs blockmode {:?}",is_ecb,blockmode);
+                    },
+                };
+            },
+            Err(e) => {
+                println!("Blackbox aes error: {:?}",e);
+            },
+        }
+        assert!(false);
+    }
+
+
+    const CIPHER_S2_E10 :&'static [u8] = 
 b"CRIwqt4+szDbqkNY+I0qbNXPg1XLaCM5etQ5Bt9DRFV/xIN2k8Go7jtArLIy\
 P605b071DL8C+FPYSHOXPkMMMFPAKm+Nsu0nCBMQVt9mlluHbVE/yl6VaBCj\
 NuOGvHZ9WYvt51uR/lklZZ0ObqD5UaC1rupZwCEK4pIWf6JQ4pTyPjyiPtKX\

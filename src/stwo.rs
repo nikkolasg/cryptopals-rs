@@ -21,6 +21,65 @@ pub enum BlockError {
     Unknown,
 }
 
+#[derive(Debug)]
+pub enum BlockMode {
+    ECB,
+    CBC,
+}
+
+pub fn random_bytes(len :usize) ->Vec<u8> {
+    let mut rng = OsRng::new().ok().unwrap();
+    rng.gen_iter::<u8>().take(len).collect::<Vec<u8>>()
+}
+
+pub fn random_u32() -> u32 {
+    let mut rng = OsRng::new().ok().unwrap();
+    rng.next_u32()
+}
+
+// Add *padding_length* bytes before and after the plaintext, choose a random BlockMode,
+// encrypt the message with it and return the message and the blockmode.
+pub fn blackbox_aes_encrypt(msg :&[u8]) -> Result<(Vec<u8>,BlockMode),BlockError> {
+    let padding_length = ((random_u32() % 10) + 5) as usize;
+    let new_length = msg.len() + 2 * padding_length;
+    let mut padded  = vec![0;new_length];
+    padded[padding_length..new_length-padding_length].clone_from_slice(msg);
+    fill_random(&mut padded[0..padding_length]);
+    fill_random(&mut padded[msg.len()..]);
+
+    let key = random_bytes(16);
+
+    let block_mode = match (rand::random::<u8>() % 2 as u8) {
+        0 => BlockMode::ECB,
+        1 => BlockMode::CBC,
+        _ => panic!("the math we know are wrong"),
+    };
+
+    println!("New msg: {:?}",padded);
+    println!("Blockmode chosen: {:?}",block_mode);
+
+    match block_mode {
+        BlockMode::ECB => {
+            match sone::encrypt_aes_ecb_pkcs(&padded,&key) { 
+                Ok(cipher) => return Ok((cipher,BlockMode::ECB)),
+                Err(e) => return Err(BlockError::Symmetric(e)),
+            };
+        },
+        BlockMode::CBC =>  {
+            // generate random IV
+            let iv = random_bytes(16);
+            match cbc_encrypt(&padded,&key,&iv) {
+                Ok(cipher) => return Ok((cipher,BlockMode::CBC)),
+                Err(e) => return Err(e),
+            }
+        },
+    }
+}
+
+fn fill_random(mut buff :&mut [u8]) {
+    let mut rng = OsRng::new().ok().unwrap();
+    rng.fill_bytes(&mut buff);
+}
 
 // pkcs7_padding will pad the given buffer using pkcs7 standard according 
 // to the given block size
@@ -131,18 +190,35 @@ fn test_pkcs_padding() {
 }
 
 #[test]
+fn test_random_bytes() {
+    let mut b1 = random_bytes(16);
+    let zero = [0u8;16];
+    assert_eq!(b1.len(),zero.len());
+    if b1 == zero {
+        assert!(false,"random bytes returns 0");
+    }
+}
+
+#[test]
 fn test_aes_cbc() {
-    let mut key: [u8; 32] = [0; 32];
-    let mut iv: [u8; 16] = [0; 16];
-    let message = "Hello World, What a Pleasure!";
+    let mut key = random_bytes(16);
+    let mut iv = random_bytes(16);
+    let message = random_bytes(16 * 4 + 7);
 
     let mut rng = OsRng::new().ok().unwrap();
     rng.fill_bytes(&mut key);
     rng.fill_bytes(&mut iv);
 
-    let cipher = cbc_encrypt(message.as_bytes(),&key,&iv).ok().unwrap();
-    let plain = cbc_decrypt(&cipher,&key,&iv).ok().unwrap();
+    let cipher = cbc_encrypt(&message,&key,&iv).ok().unwrap();
+    let plain = match cbc_decrypt(&cipher,&key,&iv) {
+        Ok(p) => p,
+        Err(e) => {
+            println!("Error decrypting: {:?}",e);
+            assert!(false);
+            return
+        }
+    };
 
-    assert_eq!(message.as_bytes(),&plain[..]);
+    assert_eq!(&message[..],&plain[..]);
     
 }

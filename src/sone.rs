@@ -31,7 +31,7 @@ macro_rules! map(
                 map
         }
     }
-);
+    );
 
 pub fn is_aes_ecb(cipher :&[u8]) -> bool {
     // split in 16 blocks
@@ -47,9 +47,35 @@ pub fn is_aes_ecb(cipher :&[u8]) -> bool {
             }
         }
     }
-
     false
 }
+
+pub fn encrypt_aes_ecb_pkcs(msg :&[u8],key :&[u8]) -> Result<Vec<u8>,SymmetricCipherError> {
+    let mut encryptor = aes::ecb_encryptor(
+        aes::KeySize::KeySize128,
+        key,
+        blockmodes::PkcsPadding);
+
+    let mut final_result = Vec::<u8>::new();
+    let mut read_buffer = buffer::RefReadBuffer::new(msg);
+    let mut buffer = [0; 4096];
+    let mut write_buffer = buffer::RefWriteBuffer::new(&mut buffer);
+
+    loop {
+        let result = try!(encryptor.encrypt(&mut read_buffer, &mut write_buffer, true));
+
+        final_result.extend(write_buffer.take_read_buffer().take_remaining().iter().map(|&i| i));
+
+        match result {
+            BufferResult::BufferUnderflow => break,
+            BufferResult::BufferOverflow => { },
+
+        }
+    }
+    Ok(final_result)
+}
+
+
 pub fn decrypt_aes_ecb_pkcs(msg :&[u8],key :&[u8]) -> Result<Vec<u8>,SymmetricCipherError>{
     decrypt_aes_ecb(msg,key,&mut aes::ecb_decryptor(aes::KeySize::KeySize128,key,blockmodes::PkcsPadding))
 }
@@ -75,11 +101,9 @@ pub fn decrypt_aes_ecb(msg :&[u8],key :&[u8],dec :&mut Box<Decryptor + 'static>)
             Ok(BufferResult::BufferUnderflow) => break,
             Ok(BufferResult::BufferOverflow)=> {},
             Err(SymmetricCipherError::InvalidPadding) => {
-                //read_buffer.rewind(16);
-                //let rest :Vec<u8>= read_buffer.take_remaining().iter().map(|&i| i).collect();
                 println!("InvalidPadding: {:?}",msg);
                 return Err(SymmetricCipherError::InvalidPadding); },
-            Err(e) => return Err(e),
+                Err(e) => return Err(e),
         }
     }
     return Ok(final_result);
@@ -457,4 +481,19 @@ fn test_chi_square_pearson() {
     let st2 = chi_square_pearson(t2,constants::FREQUENCY);
     assert!(st1 < st2);
 
+}
+
+#[test]
+fn test_ecb_encrypt() {
+    let key = "yellow submarine";
+    let msg = "Hello world how are you?";
+    match encrypt_aes_ecb_pkcs(msg.as_bytes(),key.as_bytes()) {
+        Ok(cipher) => {
+            match decrypt_aes_ecb_pkcs(&cipher,key.as_bytes()) {
+                Ok(plain) => assert_eq!(plain,msg.as_bytes()),
+                Err(_) => assert!(false),
+            }
+        },
+        Err(_) => assert!(false),
+    }
 }
